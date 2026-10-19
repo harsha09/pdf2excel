@@ -49,7 +49,7 @@ pytest --cov=pdf2excel
 - Encrypted/password-protected PDFs aren't supported.
 
 ## Need custom extraction?
-Hire me on Upwork for custom templates, batch processing, or scanned PDFs: [UPWORK_PROFILE_LINK]
+Hire me on Upwork for custom templates, batch processing, or scanned PDFs: [Upwork profile](https://www.upwork.com/freelancers/~0137eeac5e0ccd628d)
 
 ## License
 MIT — see [LICENSE](LICENSE).
