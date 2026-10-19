@@ -4,6 +4,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import IO, List, Optional, Sequence, Union
 
+import re
+
 import pandas as pd
 import pdfplumber
 
@@ -51,6 +53,14 @@ def _clean(cell) -> str:
     return " ".join(str(cell).split())
 
 
+_NUM = re.compile(r"^[-+(]?[$€£₹]?\s*[\d,]*\.?\d+\s*%?\)?$")
+
+
+def _looks_like_data(row: Sequence[str]) -> bool:
+    """A header row shouldn't contain numeric cells (e.g. 'Subtotal | 560.00')."""
+    return any(_NUM.match(c) for c in row if c)
+
+
 def _to_df(rows: Sequence[Sequence], header: bool = True) -> Optional[pd.DataFrame]:
     rows = [[_clean(c) for c in r] for r in rows]
     rows = [r for r in rows if any(r)]
@@ -58,10 +68,10 @@ def _to_df(rows: Sequence[Sequence], header: bool = True) -> Optional[pd.DataFra
         return None
     width = max(len(r) for r in rows)
     rows = [r + [""] * (width - len(r)) for r in rows]
-    if header and len(rows) > 1:
+    if header and len(rows) > 1 and not _looks_like_data(rows[0]):
         cols, seen = [], {}
         for i, c in enumerate(rows[0]):
-            c = c or f"col_{i + 1}"
+            c = c or f"Column {i + 1}"
             if c in seen:
                 seen[c] += 1
                 c = f"{c}_{seen[c]}"
@@ -69,7 +79,7 @@ def _to_df(rows: Sequence[Sequence], header: bool = True) -> Optional[pd.DataFra
                 seen[c] = 0
             cols.append(c)
         return pd.DataFrame(rows[1:], columns=cols)
-    return pd.DataFrame(rows, columns=[f"col_{i + 1}" for i in range(width)])
+    return pd.DataFrame(rows, columns=[f"Column {i + 1}" for i in range(width)])
 
 
 def _camelot_tables(path: str, page: int) -> List[pd.DataFrame]:  # pragma: no cover
@@ -119,3 +129,24 @@ def extract_tables(
             for i, df in enumerate(dfs, 1):
                 results.append(ExtractedTable(page=pno, index=i, df=df))
     return results
+
+
+def merge_tables(tables: List[ExtractedTable]) -> List[ExtractedTable]:
+    """Concatenate tables with identical headers on consecutive pages.
+
+    Repeated header rows inside the continued table are dropped.
+    """
+    merged: List[ExtractedTable] = []
+    last_page = None
+    for t in tables:
+        prev = merged[-1] if merged else None
+        cols = list(t.df.columns)
+        if (prev is not None and list(prev.df.columns) == cols
+                and last_page is not None and t.page == last_page + 1
+                and not cols[0].startswith("Column ")):
+            df = t.df[~(t.df.astype(str).values == [str(c) for c in cols]).all(axis=1)]
+            prev.df = pd.concat([prev.df, df], ignore_index=True)
+        else:
+            merged.append(ExtractedTable(page=t.page, index=t.index, df=t.df.copy()))
+        last_page = t.page
+    return merged

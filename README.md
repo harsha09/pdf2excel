@@ -2,12 +2,14 @@
 
 Extract tables from text-based PDFs (invoices, bank statements, reports) into a clean Excel workbook (one sheet per table) or CSV files. Includes a command-line tool and a simple Streamlit web UI.
 
-![screenshot](docs/screenshot.png) <!-- screenshot placeholder -->
+![Streamlit web UI converting the synthetic bank statement sample](docs/screenshot.png)
 
 ## Features
 - Detects ruled (gridline) tables and borderless, whitespace-aligned tables (pdfplumber)
 - XLSX export: one sheet per table (`p<page>_t<n>`), bold header, frozen header row, auto column widths, numeric columns (incl. `1,234.56`) converted to numbers
 - CSV export: one file per table
+- Header detection: if the first row looks like data (numbers), generic `Column 1..N` headers are used
+- `--merge`: join tables continued across consecutive pages (same headers) into one sheet, dropping repeated header rows
 - Page selection: `1`, `1-3`, `1,4-6`, `3-`
 - Optional camelot fallback (`pip install -e ".[camelot]"`, then `--camelot`)
 
@@ -21,6 +23,7 @@ pip install -e ".[web,dev]"      # core only: pip install -e .
 ```bash
 pdf2excel samples/sample_invoice.pdf -o invoice.xlsx       # one sheet per table
 pdf2excel samples/sample_bank_statement.pdf --csv -o stmt.csv   # stmt_p1_t1.csv, stmt_p2_t1.csv
+pdf2excel samples/sample_bank_statement.pdf --merge -o stmt.xlsx   # one sheet, 40 rows
 pdf2excel samples/sample_bank_statement.pdf -p 2 -o page2.xlsx
 pdf2excel report.pdf --no-header                           # keep first row as data
 ```

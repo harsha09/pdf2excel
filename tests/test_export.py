@@ -61,3 +61,11 @@ def test_cli_errors(tmp_path):
     bad = tmp_path / "bad.pdf"
     bad.write_text("not a pdf")
     assert main([str(bad), "-o", str(tmp_path / "y.xlsx")]) == 1
+
+
+def test_cli_merge(tmp_path, capsys):
+    out = tmp_path / "m.xlsx"
+    assert main([str(S / "sample_bank_statement.pdf"), "--merge", "-o", str(out)]) == 0
+    wb = load_workbook(out)
+    assert wb.sheetnames == ["p1_t1"]
+    assert wb["p1_t1"].max_row == 41  # header + 40 rows

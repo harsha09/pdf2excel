@@ -2,7 +2,9 @@ from pathlib import Path
 
 import pytest
 
-from pdf2excel import extract_tables, parse_pages
+from pdf2excel import extract_tables, merge_tables, parse_pages
+from pdf2excel.extract import ExtractedTable
+import pandas as pd
 
 S = Path(__file__).resolve().parent.parent / "samples"
 
@@ -27,7 +29,10 @@ def test_invoice():
     assert len(items) == 4
     assert items.iloc[0].tolist() == ["1", "Widget A", "10", "12.50", "125.00"]
     assert sum(float(a) for a in items["Amount"]) == 560.0
+    assert list(t[1].df.columns) == ["Column 1", "Column 2"]
+    assert t[1].df.iloc[0].tolist() == ["Subtotal", "560.00"]
     assert t[1].df.iloc[-1].tolist() == ["Total", "616.00"]
+    assert len(t[1].df) == 3
 
 
 def test_bank_statement_multipage_and_range():
@@ -59,3 +64,27 @@ def test_no_header():
 def test_stream_input():
     with open(S / "sample_invoice.pdf", "rb") as f:
         assert len(extract_tables(f)) == 2
+
+
+def test_merge_bank_statement():
+    t = merge_tables(extract_tables(str(S / "sample_bank_statement.pdf")))
+    assert len(t) == 1
+    df = t[0].df
+    assert len(df) == 40
+    assert not (df["Date"] == "Date").any()
+    assert df.iloc[-1]["Description"] == "Deposit ref 1040"
+
+
+def test_merge_rules():
+    h = ["A", "B"]
+    mk = lambda p, rows, cols=h: ExtractedTable(p, 1, pd.DataFrame(rows, columns=cols))
+    # repeated header row dropped
+    out = merge_tables([mk(1, [["1", "2"]]), mk(2, [["A", "B"], ["3", "4"]])])
+    assert len(out) == 1 and out[0].df.values.tolist() == [["1", "2"], ["3", "4"]]
+    # non-consecutive pages, different headers, generic headers -> not merged
+    assert len(merge_tables([mk(1, [["1", "2"]]), mk(3, [["3", "4"]])])) == 2
+    assert len(merge_tables([mk(1, [["1", "2"]]), mk(2, [["3", "4"]], ["X", "Y"])])) == 2
+    g = ["Column 1", "Column 2"]
+    assert len(merge_tables([mk(1, [["1", "2"]], g), mk(2, [["3", "4"]], g)])) == 2
+    # invoice: two tables on the same page stay separate
+    assert len(merge_tables(extract_tables(str(S / "sample_invoice.pdf")))) == 2

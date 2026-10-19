@@ -5,7 +5,7 @@ import zipfile
 import streamlit as st
 
 from pdf2excel.export import to_xlsx
-from pdf2excel.extract import extract_tables
+from pdf2excel.extract import extract_tables, merge_tables
 
 st.set_page_config(page_title="PDF → Excel/CSV", page_icon="📄")
 st.title("📄 PDF tables → Excel / CSV")
@@ -13,7 +13,8 @@ st.caption("Free demo · text-based PDFs only · files are processed in memory a
 
 up = st.file_uploader("Upload a PDF", type=["pdf"])
 pages = st.text_input("Pages (e.g. all, 1, 1-3, 1,4-6)", value="all")
-header = st.checkbox("First row is a header", value=True)
+header = st.checkbox("First row is a header (auto-skipped if it looks like data)", value=True)
+merge = st.checkbox("Merge tables continued across pages", value=True)
 
 if up is not None:
     try:
@@ -21,6 +22,8 @@ if up is not None:
     except Exception as e:
         st.error(f"Could not process PDF: {e}")
         st.stop()
+    if merge:
+        tables = merge_tables(tables)
     if not tables:
         st.warning("No tables found. Scanned/image PDFs need OCR (Pro version).")
         st.stop()

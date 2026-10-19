@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from .export import to_csv, to_xlsx
-from .extract import extract_tables
+from .extract import extract_tables, merge_tables
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -17,6 +17,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--csv", action="store_true", help="write CSV (one file per table) instead of XLSX")
     ap.add_argument("-p", "--pages", default="all", help="pages, e.g. '1', '1-3', '1,4-6' (default: all)")
     ap.add_argument("--no-header", action="store_true", help="don't treat first row as header")
+    ap.add_argument("--merge", action="store_true",
+                    help="merge tables with identical headers on consecutive pages into one")
     ap.add_argument("--camelot", action="store_true", help="fallback to camelot if installed and nothing found")
     args = ap.parse_args(argv)
 
@@ -35,6 +37,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     except Exception as e:  # malformed / encrypted PDFs
         print(f"error: could not read PDF: {e}", file=sys.stderr)
         return 1
+    if args.merge:
+        tables = merge_tables(tables)
     if not tables:
         print("No tables found. (Scanned/image PDFs need OCR — available in the Pro version.)", file=sys.stderr)
         return 1
